@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8"><title>Plataforma Estatística IA</title>
+    <style>body{font-family:sans-serif; max-width:600px; margin:auto; padding:20px;} input, button{width:100%; padding:10px; margin-bottom:10px; border-radius:5px;} pre{background:#eee; padding:10px; overflow-x:auto; border-radius:5px;} img{max-width:100%; margin-top:10px; border-radius:5px; box-shadow:0 2px 5px rgba(0,0,0,0.2);}</style>
+</head>
+<body>
+    <h2>Análise Estatística IA</h2>
+    <input type="file" id="arquivo" accept=".csv">
+    <input type="text" id="prompt" value="Gere um summary() dos dados">
+    <button id="btn" style="background:#0056b3; color:white; border:none; font-weight:bold;">Executar Análise</button>
+    <p id="status" style="font-style:italic; color:#555;">Iniciando motor estatístico...</p>
+    <pre id="resultado" style="display:none;"></pre>
+    <img id="grafico" style="display:none;">
+
+    <script type="module">
+        import { WebR } from '[https://webr.r-wasm.org/latest/webr.mjs](https://webr.r-wasm.org/latest/webr.mjs)';
+        let webr, csvTexto = "";
+
+        async function init() {
+            webr = new WebR(); await webr.init();
+            await webr.evalRVoid('webr::install("ggplot2")');
+            document.getElementById('status').innerText = "Motor R e ggplot2 prontos! Carregue o CSV.";
+        }
+        init();
+
+        document.getElementById('arquivo').addEventListener('change', e => {
+            const reader = new FileReader();
+            reader.onload = ev => { csvTexto = ev.target.result.replace(/\r/g, ''); document.getElementById('status').innerText="Ficheiro lido!"; };
+            reader.readAsText(e.target.files[0]);
+        });
+
+        document.getElementById('btn').addEventListener('click', async () => {
+            if(!csvTexto) return alert("Carregue o CSV primeiro.");
+            document.getElementById('status').innerText = "A pedir código à IA (Servidor Seguro)...";
+            document.getElementById('resultado').style.display = 'none';
+            document.getElementById('grafico').style.display = 'none';
+
+            try {
+                // 1. Envia o pedido para o nosso Backend na Vercel (onde a chave está escondida)
+                const resAPI = await fetch('/api/gemini', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: document.getElementById('prompt').value, csvText: csvTexto })
+                });
+                const dadosAPI = await resAPI.json();
+                if(dadosAPI.error) throw new Error(dadosAPI.error);
+
+                document.getElementById('status').innerText = "Código recebido! A processar matemática no seu dispositivo...";
+
+                // 2. Prepara o R no navegador
+                await webr.FS.writeFile('/d.csv', new TextEncoder().encode(csvTexto));
+                const sep = csvTexto.split('\n')[0].includes(';') ? ';' : ',';
+                const cmdLer = `d <- read.csv${sep===';'?'2':''}('/d.csv')`;
+                const script = `library(ggplot2)\n${cmdLer}\n${dadosAPI.codigo}`;
+
+                // 3. Executa o R
+                const run = await webr.evalR(`png('/g.png', width=800, height=500, res=120); out <- capture.output({eval(parse(text='${script.replace(/'/g, "\\'").replace(/\n/g, "\\n")}'))}); dev.off(); out`);
+                const vals = await run.toArray();
+                
+                document.getElementById('resultado').innerText = `Saída de Texto:\n${vals.join('\n')}`;
+                document.getElementById('resultado').style.display = 'block';
+
+                try {
+                    const img = await webr.FS.readFile('/g.png');
+                    document.getElementById('grafico').src = URL.createObjectURL(new Blob([img], {type:'image/png'}));
+                    document.getElementById('grafico').style.display = 'block';
+                } catch(e) {}
+                
+                document.getElementById('status').innerText = "Análise concluída!";
+            } catch(e) {
+                document.getElementById('status').innerText = "Erro!";
+                document.getElementById('resultado').innerText = e.message;
+                document.getElementById('resultado').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
