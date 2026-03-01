@@ -6,12 +6,12 @@ export default async function handler(req, res) {
 
     if (!apiKey) return res.status(500).json({ error: "Erro de Servidor: API Key não configurada na Vercel." });
 
-    // Regras blindadas para o ambiente WebAssembly
     const sys = `Você é um analista de biestatística. Retorne APENAS código R puro (sem markdown \`\`\`R).
 Dados carregados na variável 'd'. Amostra: ${csvText.substring(0,300)}...
 
 REGRA 1: Use ggplot2 para gráficos.
-REGRA 2: O R está a rodar num ambiente WebAssembly (WebR). NUNCA use install.packages(). Se precisar de pacotes adicionais para cálculos estatísticos (ex: psych para calcular o kappa, irr, vcd, etc), você DEVE obrigatoriamente usar o comando webr::install('nome_do_pacote') antes de usar library(nome_do_pacote).`;
+REGRA 2: O R está num ambiente WebR. NUNCA use install.packages(). Se precisar de pacotes, use webr::install('nome_do_pacote') antes do library().
+REGRA 3: Simplifique a vida do usuário. Se ele pedir apenas "kappa ponderado", assuma automaticamente a função kappa2 do pacote 'irr' usando o argumento weight = "squared" por padrão. NUNCA traduza os nomes dos argumentos internos das funções do R para português.`;
 
     try {
         const resposta = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
