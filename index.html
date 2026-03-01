@@ -9,35 +9,57 @@
     <input type="file" id="arquivo" accept=".csv">
     <input type="text" id="prompt" value="Gere um summary() dos dados">
     <button id="btn" style="background:#0056b3; color:white; border:none; font-weight:bold;">Executar Análise</button>
-    <p id="status" style="font-style:italic; color:#555;">Iniciando motor estatístico...</p>
+    
+    <p id="status" style="font-weight:bold; color:#b30000;">[1/2] Baixando o núcleo do R...</p>
+    
     <pre id="resultado" style="display:none;"></pre>
     <img id="grafico" style="display:none;">
 
     <script type="module">
-        import { WebR } from '[https://webr.r-wasm.org/latest/webr.mjs](https://webr.r-wasm.org/latest/webr.mjs)';
+        import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
         let webr, csvTexto = "";
+        const status = document.getElementById('status');
+        const resultado = document.getElementById('resultado');
 
+        // A Inicialização Blindada
         async function init() {
-            webr = new WebR(); await webr.init();
-            await webr.evalRVoid('webr::install("ggplot2")');
-            document.getElementById('status').innerText = "Motor R e ggplot2 prontos! Carregue o CSV.";
+            try {
+                webr = new WebR(); 
+                await webr.init();
+                status.innerText = "[2/2] R ligado! A instalar gráficos (pode demorar 30s na 1ª vez)...";
+                status.style.color = "#d2691e"; // Laranja
+                
+                await webr.evalRVoid('webr::install("ggplot2")');
+                
+                status.innerText = "Tudo pronto! Pode carregar o ficheiro CSV.";
+                status.style.color = "#008000"; // Verde
+            } catch (erro) {
+                status.innerText = "Erro ao carregar o motor estatístico. Atualize a página.";
+                status.style.color = "red";
+                resultado.innerText = erro.message;
+                resultado.style.display = 'block';
+            }
         }
         init();
 
         document.getElementById('arquivo').addEventListener('change', e => {
             const reader = new FileReader();
-            reader.onload = ev => { csvTexto = ev.target.result.replace(/\r/g, ''); document.getElementById('status').innerText="Ficheiro lido!"; };
+            reader.onload = ev => { 
+                csvTexto = ev.target.result.replace(/\r/g, ''); 
+                status.innerText="Ficheiro lido com sucesso!"; 
+                status.style.color = "#0056b3"; // Azul
+            };
             reader.readAsText(e.target.files[0]);
         });
 
         document.getElementById('btn').addEventListener('click', async () => {
             if(!csvTexto) return alert("Carregue o CSV primeiro.");
-            document.getElementById('status').innerText = "A pedir código à IA (Servidor Seguro)...";
-            document.getElementById('resultado').style.display = 'none';
+            status.innerText = "A pedir código à IA (Servidor Seguro)...";
+            resultado.style.display = 'none';
             document.getElementById('grafico').style.display = 'none';
 
             try {
-                // 1. Envia o pedido para o nosso Backend na Vercel (onde a chave está escondida)
+                // Chama a Vercel
                 const resAPI = await fetch('/api/gemini', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt: document.getElementById('prompt').value, csvText: csvTexto })
@@ -45,20 +67,18 @@
                 const dadosAPI = await resAPI.json();
                 if(dadosAPI.error) throw new Error(dadosAPI.error);
 
-                document.getElementById('status').innerText = "Código recebido! A processar matemática no seu dispositivo...";
+                status.innerText = "A renderizar matemática e gráficos...";
 
-                // 2. Prepara o R no navegador
                 await webr.FS.writeFile('/d.csv', new TextEncoder().encode(csvTexto));
                 const sep = csvTexto.split('\n')[0].includes(';') ? ';' : ',';
                 const cmdLer = `d <- read.csv${sep===';'?'2':''}('/d.csv')`;
                 const script = `library(ggplot2)\n${cmdLer}\n${dadosAPI.codigo}`;
 
-                // 3. Executa o R
                 const run = await webr.evalR(`png('/g.png', width=800, height=500, res=120); out <- capture.output({eval(parse(text='${script.replace(/'/g, "\\'").replace(/\n/g, "\\n")}'))}); dev.off(); out`);
                 const vals = await run.toArray();
                 
-                document.getElementById('resultado').innerText = `Saída de Texto:\n${vals.join('\n')}`;
-                document.getElementById('resultado').style.display = 'block';
+                resultado.innerText = `Saída de Texto:\n${vals.join('\n')}`;
+                resultado.style.display = 'block';
 
                 try {
                     const img = await webr.FS.readFile('/g.png');
@@ -66,11 +86,12 @@
                     document.getElementById('grafico').style.display = 'block';
                 } catch(e) {}
                 
-                document.getElementById('status').innerText = "Análise concluída!";
+                status.innerText = "Análise concluída!";
             } catch(e) {
-                document.getElementById('status').innerText = "Erro!";
-                document.getElementById('resultado').innerText = e.message;
-                document.getElementById('resultado').style.display = 'block';
+                status.innerText = "Falha na análise.";
+                status.style.color = "red";
+                resultado.innerText = "Erro do Servidor: " + e.message;
+                resultado.style.display = 'block';
             }
         });
     </script>
