@@ -2,11 +2,16 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
 
     const { prompt, csvText } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY; // A chave secreta que vamos colocar na Vercel
+    const apiKey = process.env.GEMINI_API_KEY; 
 
     if (!apiKey) return res.status(500).json({ error: "Erro de Servidor: API Key não configurada." });
 
-    const sys = `Retorne APENAS código R (sem markdown). Use ggplot2 para gráficos. Dados na variável 'd'. Amostra: ${csvText.substring(0,300)}`;
+    // A MÁGICA NOVA: Instrução rigorosa para a IA instalar pacotes sob demanda
+    const sys = `Você é um analista de biestatística. Retorne APENAS código R puro (sem markdown \`\`\`R).
+Dados carregados na variável 'd'. Amostra: ${csvText.substring(0,300)}...
+
+REGRA 1: Use ggplot2 para gráficos.
+REGRA 2: Se precisar de pacotes adicionais para cálculos (ex: vcd, psych, irr, pROC), você DEVE obrigatoriamente incluir a linha suppressMessages(install.packages('nome_do_pacote')) ANTES de chamar library().`;
 
     try {
         const resposta = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
