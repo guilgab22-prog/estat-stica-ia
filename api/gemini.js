@@ -6,12 +6,18 @@ export default async function handler(req, res) {
 
     if (!apiKey) return res.status(500).json({ error: "Erro de Servidor: API Key não configurada na Vercel." });
 
+    // Pega a primeira linha do CSV (os nomes das colunas) para a IA não alucinar
+    const colunasExatas = csvText.split('\n')[0];
+
     const sys = `Você é um analista de biestatística. Retorne APENAS código R puro (sem markdown \`\`\`R).
-Dados carregados na variável 'd'. Amostra: ${csvText.substring(0,300)}...
+Dados carregados na variável 'd'. 
+Nomes EXATOS das colunas disponíveis: ${colunasExatas}
+Amostra dos dados: ${csvText.substring(0,250)}...
 
 REGRA 1: Use ggplot2 para gráficos.
-REGRA 2: O R está num ambiente WebR. NUNCA use install.packages(). Se precisar de pacotes, use webr::install('nome_do_pacote') antes do library().
-REGRA 3: Simplifique a vida do usuário. Se ele pedir apenas "kappa ponderado", assuma automaticamente a função kappa2 do pacote 'irr' usando o argumento weight = "squared" por padrão. NUNCA traduza os nomes dos argumentos internos das funções do R para português.`;
+REGRA 2: O R está num ambiente WebR. Use apenas webr::install('nome_do_pacote') antes de library(). NUNCA use install.packages().
+REGRA 3: Se o usuário pedir "kappa ponderado", use irr::kappa2(weight="squared").
+REGRA 4: NUNCA invente nomes de colunas. Use ESTRITAMENTE os nomes listados acima. Se o usuário pedir algo genérico, deduza qual é a coluna exata correspondente.`;
 
     try {
         const resposta = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
