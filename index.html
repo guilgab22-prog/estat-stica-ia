@@ -1,65 +1,17 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8"><title>Plataforma Estatística IA</title>
-    <style>body{font-family:sans-serif; max-width:600px; margin:auto; padding:20px;} input, button{width:100%; padding:10px; margin-bottom:10px; border-radius:5px;} pre{background:#eee; padding:10px; overflow-x:auto; border-radius:5px;} img{max-width:100%; margin-top:10px; border-radius:5px; box-shadow:0 2px 5px rgba(0,0,0,0.2);}</style>
-</head>
-<body>
-    <h2>Análise Estatística IA</h2>
-    <input type="file" id="arquivo" accept=".csv">
-    <input type="text" id="prompt" value="Gere um summary() dos dados">
-    <button id="btn" style="background:#0056b3; color:white; border:none; font-weight:bold;">Executar Análise</button>
-    
-    <p id="status" style="font-weight:bold; color:#b30000;">[1/2] Baixando o núcleo do R...</p>
-    
-    <pre id="resultado" style="display:none;"></pre>
-    <img id="grafico" style="display:none;">
-
-    <script type="module">
-        import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
-        let webr, csvTexto = "";
-        const status = document.getElementById('status');
-        const resultado = document.getElementById('resultado');
-
-        // A Inicialização Blindada
-        async function init() {
-            try {
-                webr = new WebR(); 
-                await webr.init();
-                status.innerText = "[2/2] R ligado! A instalar gráficos (pode demorar 30s na 1ª vez)...";
-                status.style.color = "#d2691e"; // Laranja
-                
-                await webr.evalRVoid('webr::install("ggplot2")');
-                
-                status.innerText = "Tudo pronto! Pode carregar o ficheiro CSV.";
-                status.style.color = "#008000"; // Verde
-            } catch (erro) {
-                status.innerText = "Erro ao carregar o motor estatístico. Atualize a página.";
-                status.style.color = "red";
-                resultado.innerText = erro.message;
-                resultado.style.display = 'block';
-            }
-        }
-        init();
-
-        document.getElementById('arquivo').addEventListener('change', e => {
-            const reader = new FileReader();
-            reader.onload = ev => { 
-                csvTexto = ev.target.result.replace(/\r/g, ''); 
-                status.innerText="Ficheiro lido com sucesso!"; 
-                status.style.color = "#0056b3"; // Azul
-            };
-            reader.readAsText(e.target.files[0]);
-        });
-
         document.getElementById('btn').addEventListener('click', async () => {
             if(!csvTexto) return alert("Carregue o CSV primeiro.");
+            
+            // O CADEADO: Desliga o botão imediatamente após o primeiro toque
+            const btn = document.getElementById('btn');
+            btn.disabled = true;
+            btn.style.background = "#ccc";
+            btn.innerText = "A processar...";
+
             status.innerText = "A pedir código à IA (Servidor Seguro)...";
             resultado.style.display = 'none';
             document.getElementById('grafico').style.display = 'none';
 
             try {
-                // Chama a Vercel
                 const resAPI = await fetch('/api/gemini', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt: document.getElementById('prompt').value, csvText: csvTexto })
@@ -92,8 +44,10 @@
                 status.style.color = "red";
                 resultado.innerText = "Erro do Servidor: " + e.message;
                 resultado.style.display = 'block';
+            } finally {
+                // TIRA O CADEADO: Volta a ligar o botão no final, dê erro ou sucesso
+                btn.disabled = false;
+                btn.style.background = "#0056b3";
+                btn.innerText = "Executar Análise";
             }
         });
-    </script>
-</body>
-</html>
