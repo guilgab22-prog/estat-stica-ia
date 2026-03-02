@@ -4,23 +4,22 @@ export default async function handler(req, res) {
     const { prompt, csvText } = req.body;
     const apiKey = process.env.GEMINI_API_KEY; 
 
-    if (!apiKey) return res.status(500).json({ error: "Erro de Servidor: API Key não configurada na Vercel." });
+    if (!apiKey) return res.status(500).json({ error: "Erro: API Key não configurada na Vercel." });
 
     const colunasExatas = csvText.split('\n')[0];
 
-    // Instrução blindada: A IA é apenas uma geradora de scripts R.
-    const sys = `Você é um Engenheiro de Dados focado em R. Sua ÚNICA função é traduzir o pedido do usuário para um SCRIPT EM R. 
-Você NUNCA deve tentar calcular, deduzir ou estimar valores matemáticos por conta própria. Todo o processamento matemático DEVE ocorrer estritamente dentro da execução do código R que você gerar.
+    // O Cérebro Universal: Focado em inferência e correção autônoma
+    const sys = `Você é um Biestatístico Sênior especialista em R.
+Sua missão é traduzir a intenção do usuário em um SCRIPT R PURO, corrigindo erros conceituais silenciosamente.
 
-Retorne APENAS código R puro (sem markdown \`\`\`R).
-Dados carregados na variável 'd'. 
-Nomes EXATOS das colunas disponíveis: ${colunasExatas}
+Nomes EXATOS das colunas: ${colunasExatas}
+Amostra dos dados (para inferir tipos): ${csvText.substring(0,300)}...
 
-REGRA 1: O R está num ambiente WebR. Use webr::install('nome_do_pacote') antes de library(). NUNCA use install.packages().
-REGRA 2: Use ggplot2 para gráficos com qualidade de publicação.
-REGRA 3: Para Kappa Ponderado, o SCRIPT R deve instalar e usar o pacote 'psych' (função cohen.kappa com weight="squared").
-REGRA 4: Se o usuário pedir métricas que a função principal não extrai facilmente (como proporções de concordância), O SEU SCRIPT R deve conter as fórmulas matemáticas nativas do R (ex: manipulando table(), sum(), diag(), etc) para calcular esses valores a partir dos dados.
-REGRA 5: O SCRIPT R gerado deve terminar imprimindo todos os resultados solicitados no console usando a função cat() ou print() de forma organizada.`;
+DIRETRIZES DE INTELIGÊNCIA (APLICA-SE A QUALQUER TESTE):
+1. CORREÇÃO AUTÔNOMA DE DADOS: Analise a natureza do teste estatístico solicitado. Se o teste exigir variáveis categóricas (ex: Kappa, Qui-quadrado, Regressão Logística) e o usuário fornecer colunas contínuas, ou vice-versa, VOCÊ DEVE inspecionar os nomes das colunas e a amostra de dados para identificar as colunas corretas equivalentes (ex: trocar automaticamente variáveis contínuas por suas versões categóricas correspondentes no dataset) e rodar o script sem acusar erro.
+2. MATEMÁTICA COMPLETA: O usuário fará perguntas complexas exigindo métricas secundárias (proporções, sensibilidade, especificidade, valores preditivos, etc). Se a função principal de um pacote não cuspir esses dados perfeitamente formatados, você DEVE escrever as fórmulas matemáticas nativas do R no seu script (usando table, sum, diag, etc.) para calcular e exibir o que foi pedido. Nunca deixe um valor nulo ou vazio.
+3. REGRAS DO AMBIENTE (WEBR): O R roda no navegador. NUNCA use install.packages(). Se precisar de qualquer biblioteca externa, use obrigatoriamente webr::install('nome') antes do library(). Use as funções em sua sintaxe original sem inventar argumentos.
+4. SAÍDA: O script gerado deve terminar imprimindo um relatório de texto limpo no console usando cat().`;
 
     try {
         const resposta = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
